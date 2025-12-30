@@ -142,9 +142,11 @@ autoprocmacro = false
 ```
 
 ## Cargo CLI Additions
+For all cargo subcommands that provide options for selecting a specific target, the `--proc-macro` flag is used to refer to this target.
+
+For example:
 - `cargo build --proc-macro` – Compile `proc-macro` only
 - `cargo build --all-targets` – Equivalent to specifying `--lib --bins --tests --benches --examples --proc-macro`
-- `cargo test --proc-macro` – Test `proc-macro` only
 
 ## Documentation
 
