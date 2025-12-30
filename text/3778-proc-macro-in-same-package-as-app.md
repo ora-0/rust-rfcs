@@ -148,7 +148,13 @@ autoprocmacro = false
 
 ## Documentation
 
-There would be a new item listed under "Crates" of the sidebar, for the new crate. This should only display "macros" — or whatever the name of the `proc-macro` crate happened to be called — of the current package. 
+Running `cargo doc` automatically creates documentation for the macro crate by default. The identifier would be:
+- the name of the crate as specified in cargo.toml, if it has been overriden
+- otherwise, if the name of the macro crate is on its default value ('macros'): the name of the package, with `.macros` appended to it. *For example: `my-library.macros`*
+
+This is to prevent name collisions in the documentation, since dependecies may also produce the `macros` target.
+
+In the case that the user has specified `doc = false`, the `--proc-macro` flag can be used to explicitly tell `cargo doc` to generate documentation for this target.
 
 # Drawbacks
 [drawbacks]: #drawbacks
