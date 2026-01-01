@@ -165,6 +165,20 @@ In the case that the user has specified `doc = false`, the `--proc-macro` flag c
 2. Migrations - Existing crates now need to migrate to the new system, taking time, and it may cause some exisiting code that's always using the latest version of libraries to break.
 3. Build systems that aren't Cargo needs to update to keep up with this feature
 
+## Dependency Relationships
+Take the standard relationship between two packages: the main `lib`, and the corresponding `lib-derive`. 
+
+`lib: 1.0.0` depends on `lib-derive: 1.0.0` , but `lib-derive` needs testing, so it itself depends on `lib` (`1.0.0`). When updates happen, they have be synced up, which is acheived by specifying `=x.x.x` as its version, and could cause problems if improperly handled. **This happens naturally if they are merged into a single package.** This is an advantage. However, there is another case.
+
+Some crates like serde seperate the 'core' functionality and the macros: `serde-core` and `serde-derive` are two packages, which are re-exported in a façade package `serde`. (Sidenote: This would encounter the same problems as the previous scenario, where versions needs to be synced.)
+
+This provides an edge over feature gating (what would be used in the previous example), and can be seen when another package `serde-json` depends on only `serde-core`, and not the entire `serde`. This way, `serde-json` can be compiled as soon as `serde-core` is, and doesn't need to wait for `serde-derive`.
+
+The downside of this RFC is that if there are two crates that depend on a library with both a `lib` component and a `proc-macro` component, one of them may need to pay for more compilation time. 
+Say, if this library allows users to choose whether or not they need macros, by providing a `macros` feature gate. If both crates don't need `macros`, then we can save some compilation time. However, when one of them enables `macros`, **then both crates needs to wait for the `proc-macro` target to be compiled, even if the other crate does not need the extra functionality.** This is the drawback.
+
+Rendered, libraries such as `serde` would be unlikely to make use of the proposed feature, but other libraries — if the tradeoff is considered — and application code could be improved.
+
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
