@@ -49,9 +49,9 @@ $ cargo build --proc-macro
 
 ## Importing
 [importing]: #importing
-To use the proc macro, simply import it via `macros::*`.
+To use the proc macro, simply import it via `proc_macro::*`.
 ```rust
-use macros::my_macro;
+use proc_macro::my_macro;
 ```
 
 Note that macros is only available to inside the package (i.e. bin, lib, examples...). This means that one would have to reexport the macros in `lib.rs` in order for users of a library to use it. It would still be available in `main.rs`, `tests`, `examples`, etc, though.
@@ -126,7 +126,7 @@ Like `tests` or `lib`, this would have its own `[proc-macro]` section in cargo.t
 Here are all the options available under it, the values set are its default.
 ```toml
 [proc-macro]
-name = "macros"
+name = "proc_macro"
 path = "proc-macro/lib.rs"
 test = true
 doctest = true
@@ -152,9 +152,9 @@ For example:
 
 Running `cargo doc` automatically creates documentation for the macro crate by default. The identifier would be:
 - the name of the crate as specified in cargo.toml, if it has been overriden
-- otherwise, if the name of the macro crate is on its default value ('macros'): the name of the package, with `.macros` appended to it. *For example: `my-library.macros`*
+- otherwise, if the name of the macro crate is on its default value: the name of the package, with `.proc_macro` appended to it. *For example: `my-library.proc_macro`*
 
-This is to prevent name collisions in the documentation, since dependecies may also produce the `macros` target.
+This is to prevent name collisions in the documentation, since dependecies may also produce the `proc-macro` target.
 
 In the case that the user has specified `doc = false`, the `--proc-macro` flag can be used to explicitly tell `cargo doc` to generate documentation for this target.
 
@@ -197,6 +197,8 @@ This would suffer from the same issue as the last alternative, plus being harder
 4. Introspection
 
 Harder to implement, with less payoff relative to the amount of work required. 
+
+5. Naming conventions: `proc-macro` is chosen as the name of the target to align with existing formats. See [the `crate-type` field](https://doc.rust-lang.org/cargo/reference/cargo-targets.html#the-crate-type-field). Furthermore, many projects already have a `macros` module for declarative macros, thus we use `proc_macro` as the crate name to avoid a collision.
 
 # Prior art
 [prior-art]: #prior-art
