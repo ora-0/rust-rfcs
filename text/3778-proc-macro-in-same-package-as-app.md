@@ -13,27 +13,29 @@ Have a new target in a cargo project, called `proc-macro`. Its default location 
 
 A common thing to ask about proc macros when first learning them is: "Why on earth does it have to be in a separate package?!" Of course, we eventually get to know that the reason is that proc macros are basically *compiler plugins*, meaning that they have to be compiled first, before the main code is compiled. So in summary, one needs to be compiled before the other.
 
+**To be absolutely clear**, this is not a proposal for same-*crate* proc macros (unlike previous proposals), but same-*package* proc macros: a much simpler problem. In a package, we already have mechanisms of compiling one target before another (for example lib before bin).
+
+There are two major benefits:
+
+## For Library <small>(and application, actually)</small> Code
+Take the standard relationship between two packages: the main `lib`, and the corresponding `lib-derive`. 
+
+`lib: 1.0.0` depends on `lib-derive: 1.0.0` , but `lib-derive` needs testing, or APIs from `lib`, so it itself depends on `lib` (`1.0.0`). When updates happen, they have be synced up, which is acheived by specifying `=x.x.x` as its version, and could cause problems if improperly handled. **This happens naturally if they are merged into a single package.**
+
+Through having them together, the relationship between the `lib` and its corresponding `lib-derive` is enforced. Having this "official" way of declaring that these two crates are related means (1) the experience would be smoother and (2) there could be more improvements made upon this. One such improvement is opening up the possibility `$crate` (or somethig akin to it) for procedural macros.
+
+## For Application Code
 Currently, we create a new proc macro as so:
 1. Create a new package
 2. In its cargo.toml, specify that it is a proc macro package
 3. In the main project, add the package as a dependency
 4. Implement the proc macro in the new package
 
-While this doesn't seem like a lot, with reasons explained later, could actually be making code worse.
-
-It doesn't have to be this way though, because we already have this mechanism of compiling one thing before another – for example, the `tests` directory. It relies on the `src` directory being built first, and likewise we could introduce a `proc-macro` target that would compile before `src`.
-
-**To be absolutely clear**, this is not a proposal for same-*crate* proc macros (unlike previous proposals), but same-*package* proc macros: a much simpler problem. 
-
-The motivation of this new target comes down to just convenience. This may sound crude at first, but convenience is a key part of any feature in software. It is known in UX design that every feature has an *interaction cost*: how much effort do I need to put in to use the feature? For example, a feature with low interaction cost, with text editor support, is renaming a variable. Just press F2 and type in a new name. What this provides is incredibly useful – without it, having a subpar variable/function name needed a high interaction cost, especially if it is used across multiple files, and as a result, we are discouraged to change variable names to make it better, when we have retrospect. With a lower interaction cost, the renaming operation is greatly promoted, and leads to better code.
+It is known in UX design that every feature has an *interaction cost*: how much effort do I need to put in to use the feature? For example, a feature with low interaction cost, with text editor support, is renaming a variable. Just press F2 and type in a new name. What this provides is incredibly useful – without it, having a subpar variable/function name needed a high interaction cost, especially if it is used across multiple files, and as a result, we are discouraged to change variable names to make it better, when we have retrospect. With a lower interaction cost, the renaming operation is greatly promoted, and leads to better code.
 
 This proposal aims smooth out the user experience when it comes to creating new proc macro, and achieve a similar effect to the F2 operation. It is important to emphasise that proc macros can dramatically simplify code, especially derive macros, but they a lot of the times aren't used because of all the extra hoops one has to get through. This would make proc macros (more of) "yet another feature", rather than a daunting one.
 
 An objection to this one might raise is "How much harder is typing in `cargo new` than `mkdir proc-macro`?" But we should consider if we would still use as much integration tests if the `tests` directory if it is required to be in a seperate package. The answer is most likely less. This is because (1) having a new package requires ceremony, like putting in a new dependency in cargo.toml, and (2) requires adding to the project structure. A *tiny* bit in lowering the interaction cost, even from 2 steps to 1, can greatly improve the user experience. 
-
-Another benefit is that a library developer don't have to manage two packages if one requires proc macros, and make them be in sync with each other.
-
-In summary (TL;DR), the effort one needs to put in to use a feature is extremely important. Proc macros currently has a higher ceiling, needing one to create a whole new package in order to use it, and lowering the ceiling, even just a little bit, could massively improve user experience. This proposal can lower it.
 
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
@@ -165,19 +167,17 @@ In the case that the user has specified `doc = false`, the `--proc-macro` flag c
 2. Migrations - Existing crates now need to migrate to the new system, taking time, and it may cause some exisiting code that's always using the latest version of libraries to break.
 3. Build systems that aren't Cargo needs to update to keep up with this feature
 
-## Dependency Relationships
-Take the standard relationship between two packages: the main `lib`, and the corresponding `lib-derive`. 
+## 3-Part Libraries
+*Not so much of a drawback as it is a limitation, but it felt like this was the most appropriate section to put this in.*
 
-`lib: 1.0.0` depends on `lib-derive: 1.0.0` , but `lib-derive` needs testing, so it itself depends on `lib` (`1.0.0`). When updates happen, they have be synced up, which is acheived by specifying `=x.x.x` as its version, and could cause problems if improperly handled. **This happens naturally if they are merged into a single package.** This is an advantage. However, there is another case.
-
-Some crates like serde seperate the 'core' functionality and the macros: `serde-core` and `serde-derive` are two packages, which are re-exported in a façade package `serde`. (Sidenote: This would encounter the same problems as the previous scenario, where versions needs to be synced.)
+Some crates like serde seperate the 'core' functionality and the macros: `serde-core` and `serde-derive` are two packages, which are re-exported in a façade package `serde`. (Sidenote: This would also encounter syncing issues)
 
 This provides an edge over feature gating (what would be used in the previous example), and can be seen when another package `serde-json` depends on only `serde-core`, and not the entire `serde`. This way, `serde-json` can be compiled as soon as `serde-core` is, and doesn't need to wait for `serde-derive`.
 
 The downside of this RFC is that if there are two crates that depend on a library with both a `lib` component and a `proc-macro` component, one of them may need to pay for more compilation time. 
-Say, if this library allows users to choose whether or not they need macros, by providing a `macros` feature gate. If both crates don't need `macros`, then we can save some compilation time. However, when one of them enables `macros`, **then both crates needs to wait for the `proc-macro` target to be compiled, even if the other crate does not need the extra functionality.** This is the drawback.
+Say, if this library allows users to choose whether or not they need macros, by providing a `macros` feature gate. If both crates don't need `macros`, then we can save some compilation time. However, when one of them enables `macros`, **then both crates needs to wait for the `proc-macro` target to be compiled, even if the other crate does not need the extra functionality.**
 
-Rendered, libraries such as `serde` would be unlikely to make use of the proposed feature, but other libraries — if the tradeoff is considered — and application code could be improved.
+Rendered, libraries such as `serde` would be unlikely to make use of the proposed feature, but other libraries like `tokio`, which finds that only two parts are needed, and application code could be improved.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
